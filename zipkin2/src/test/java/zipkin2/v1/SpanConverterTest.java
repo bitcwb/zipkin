@@ -156,37 +156,6 @@ public class SpanConverterTest {
   }
 
   @Test
-  public void redundantAddressAnnotations() {
-    Span v2 =
-        Span.newBuilder()
-            .traceId("1")
-            .parentId("2")
-            .id("3")
-            .kind(Kind.CLIENT)
-            .name("get")
-            .localEndpoint(FRONTEND)
-            .timestamp(1472470996199000L)
-            .duration(207000L)
-            .build();
-
-    V1Span v1 =
-        V1Span.newBuilder()
-            .traceId(1L)
-            .parentId(2L)
-            .id(3L)
-            .name("get")
-            .timestamp(1472470996199000L)
-            .duration(207000L)
-            .addAnnotation(1472470996199000L, "cs", FRONTEND)
-            .addAnnotation(1472470996406000L, "cr", FRONTEND)
-            .addBinaryAnnotation("ca", FRONTEND)
-            .addBinaryAnnotation("sa", FRONTEND)
-            .build();
-
-    assertThat(v1SpanConverter.convert(v1)).containsExactly(v2);
-  }
-
-  @Test
   public void server() {
     Span v2 =
         Span.newBuilder()
@@ -199,7 +168,7 @@ public class SpanConverterTest {
             .timestamp(1472470996199000L)
             .duration(207000L)
             .putTag("http.path", "/api")
-            .putTag("clnt/finagle.version", "6.45.0")
+            .putTag("finagle.version", "6.45.0")
             .build();
 
     V1Span v1 =
@@ -212,64 +181,11 @@ public class SpanConverterTest {
             .addAnnotation(1472470996199000L, "sr", BACKEND)
             .addAnnotation(1472470996406000L, "ss", BACKEND)
             .addBinaryAnnotation("http.path", "/api", BACKEND)
-            .addBinaryAnnotation("clnt/finagle.version", "6.45.0", BACKEND)
+            .addBinaryAnnotation("finagle.version", "6.45.0", BACKEND)
             .addBinaryAnnotation("ca", FRONTEND)
             .build();
 
     assertThat(v2SpanConverter.convert(v2)).isEqualToComparingFieldByFieldRecursively(v1);
-    assertThat(v1SpanConverter.convert(v1)).containsExactly(v2);
-  }
-
-  /** Fix a v1 reported half in new style and half in old style, ex via a bridge */
-  @Test
-  public void client_missingCs() {
-    Span v2 =
-        Span.newBuilder()
-            .traceId("1")
-            .id("2")
-            .name("get")
-            .kind(Kind.CLIENT)
-            .localEndpoint(FRONTEND)
-            .timestamp(1472470996199000L)
-            .duration(207000L)
-            .build();
-
-    V1Span v1 =
-        V1Span.newBuilder()
-            .traceId("1")
-            .id("2")
-            .name("get")
-            .timestamp(1472470996199000L)
-            .duration(207000L)
-            .addAnnotation(1472470996406000L, "cs", FRONTEND)
-            .build();
-
-    assertThat(v1SpanConverter.convert(v1)).containsExactly(v2);
-  }
-
-  @Test
-  public void server_missingSr() {
-    Span v2 =
-        Span.newBuilder()
-            .traceId("1")
-            .id("2")
-            .name("get")
-            .kind(Kind.SERVER)
-            .localEndpoint(BACKEND)
-            .timestamp(1472470996199000L)
-            .duration(207000L)
-            .build();
-
-    V1Span v1 =
-        V1Span.newBuilder()
-            .traceId("1")
-            .id("2")
-            .name("get")
-            .timestamp(1472470996199000L)
-            .duration(207000L)
-            .addAnnotation(1472470996406000L, "ss", BACKEND)
-            .build();
-
     assertThat(v1SpanConverter.convert(v1)).containsExactly(v2);
   }
 
@@ -327,7 +243,34 @@ public class SpanConverterTest {
     assertThat(v1SpanConverter.convert(v1)).containsExactly(v2);
   }
 
-  /** Late flushed data on a v1 v1 */
+  @Test
+  public void server_incomplete_shared() {
+    Span v2 =
+      Span.newBuilder()
+        .traceId("1")
+        .parentId('2')
+        .id("3")
+        .name("get")
+        .kind(Kind.SERVER)
+        .shared(true)
+        .localEndpoint(BACKEND)
+        .timestamp(1472470996199000L)
+        .build();
+
+    V1Span v1 =
+      V1Span.newBuilder()
+        .traceId("1")
+        .parentId('2')
+        .id("3")
+        .name("get")
+        .addAnnotation(1472470996199000L, "sr", BACKEND)
+        .build();
+
+    assertThat(v2SpanConverter.convert(v2)).isEqualToComparingFieldByFieldRecursively(v1);
+    assertThat(v1SpanConverter.convert(v1)).containsExactly(v2);
+  }
+
+  /** Late flushed data on a v2 span */
   @Test
   public void lateRemoteEndpoint_ss() {
     Span v2 =
@@ -335,7 +278,7 @@ public class SpanConverterTest {
             .traceId("1")
             .parentId("1")
             .id("2")
-            .name("foo")
+            .name("get")
             .kind(Kind.SERVER)
             .localEndpoint(BACKEND)
             .remoteEndpoint(FRONTEND)
@@ -347,7 +290,7 @@ public class SpanConverterTest {
             .traceId(1L)
             .parentId(1L)
             .id(2L)
-            .name("foo")
+            .name("get")
             .addAnnotation(1472470996199000L, "ss", BACKEND)
             .addBinaryAnnotation("ca", FRONTEND)
             .build();
@@ -793,6 +736,90 @@ public class SpanConverterTest {
             .build();
 
     assertThat(v2SpanConverter.convert(v2)).isEqualToComparingFieldByFieldRecursively(v1);
+    assertThat(v1SpanConverter.convert(v1)).containsExactly(v2);
+  }
+
+  /** Fix a v1 reported half in new style and half in old style, ex via a bridge */
+  @Test
+  public void client_missingCs() {
+    Span v2 =
+      Span.newBuilder()
+        .traceId("1")
+        .id("2")
+        .name("get")
+        .kind(Kind.CLIENT)
+        .localEndpoint(FRONTEND)
+        .timestamp(1472470996199000L)
+        .duration(207000L)
+        .build();
+
+    V1Span v1 =
+      V1Span.newBuilder()
+        .traceId("1")
+        .id("2")
+        .name("get")
+        .timestamp(1472470996199000L)
+        .duration(207000L)
+        .addAnnotation(1472470996406000L, "cs", FRONTEND)
+        .build();
+
+    assertThat(v1SpanConverter.convert(v1)).containsExactly(v2);
+  }
+
+  @Test
+  public void server_missingSr() {
+    Span v2 =
+      Span.newBuilder()
+        .traceId("1")
+        .id("2")
+        .name("get")
+        .kind(Kind.SERVER)
+        .localEndpoint(BACKEND)
+        .timestamp(1472470996199000L)
+        .duration(207000L)
+        .build();
+
+    V1Span v1 =
+      V1Span.newBuilder()
+        .traceId("1")
+        .id("2")
+        .name("get")
+        .timestamp(1472470996199000L)
+        .duration(207000L)
+        .addAnnotation(1472470996406000L, "ss", BACKEND)
+        .build();
+
+    assertThat(v1SpanConverter.convert(v1)).containsExactly(v2);
+  }
+
+  @Test
+  public void redundantAddressAnnotations() {
+    Span v2 =
+      Span.newBuilder()
+        .traceId("1")
+        .parentId("2")
+        .id("3")
+        .kind(Kind.CLIENT)
+        .name("get")
+        .localEndpoint(FRONTEND)
+        .timestamp(1472470996199000L)
+        .duration(207000L)
+        .build();
+
+    V1Span v1 =
+      V1Span.newBuilder()
+        .traceId(1L)
+        .parentId(2L)
+        .id(3L)
+        .name("get")
+        .timestamp(1472470996199000L)
+        .duration(207000L)
+        .addAnnotation(1472470996199000L, "cs", FRONTEND)
+        .addAnnotation(1472470996406000L, "cr", FRONTEND)
+        .addBinaryAnnotation("ca", FRONTEND)
+        .addBinaryAnnotation("sa", FRONTEND)
+        .build();
+
     assertThat(v1SpanConverter.convert(v1)).containsExactly(v2);
   }
 
