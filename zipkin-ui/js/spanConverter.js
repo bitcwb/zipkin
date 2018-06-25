@@ -28,9 +28,7 @@ function toV1Annotation(ann, endpoint) {
   return res;
 }
 
-// Copied from https://github.com/openzipkin/zipkin-js/blob/8018e441d01804b02d0d217f10cd82759e71e02a/packages/zipkin/src/jsonEncoder.js#L25
-// Modified to correct assumption that 'annotations' always exist and ensure
-// that 'begin' comes first timestamp/duration should always be copied over
+// ported from zipkin2.v1.V1SpanConverter
 function convertV1(span) {
   const res = {
     traceId: span.traceId,
